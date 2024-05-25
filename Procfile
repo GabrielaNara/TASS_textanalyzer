@@ -1,1 +1,1 @@
-web: gunicorn Tass_textanalyzer:server
+web: gunicorn Tass_textanalyzer:app.server
