@@ -12,6 +12,7 @@ import re
 data = None
 #tokens_text = None
 tokens_text = "" 
+text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}
 
 def clean_text(text):
     stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aqueles', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'parque', 'praça', 'local', 'lugar', 'ponto', 'pois', 'porque']
@@ -47,13 +48,15 @@ app.layout = html.Div(children=[
                 html.H1(children='Text Analyzer by TASS', style={'margin': '20px auto','textAlign': 'center', 'fontSize': '48px'}), 
                 html.Div(style={'height': '30px'}), 
                 #---------------------------------------------------- PASSO 1-------------------------------------------------------------------------------------
-                html.H1(children='Passo 1: Aplicando a Linguagem Natural', style={'margin': '20px auto','textAlign': 'center'}),
-                html.H1(children='Como requisito o arquivo deve ter o formato .xlsx e 1 coluna chamada text'
-                        , style={'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
+                html.H1(children='Passo 1: Processamento de Linguagem Natural', style={'margin': '20px auto','textAlign': 'center'}),
+                html.H1(children='O arquivo deve ter o formato .xlsx e 1 coluna chamada text.', 
+                        style=text_style), 
+                html.H1(children='O processamento de linguagem natural é feito com os dos dados dessa coluna, gerando uma outra coluna chamada tokens, que são as palavras relevantes do texto.', 
+                        style={**text_style, **{'margin-bottom': '30px'}}),  
                 dcc.Upload(
-                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo CSV')]),
-                    style={'width': '90%', 'maxWidth': '300px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
-                        'textAlign': 'center', 'margin': '20px auto'},
+                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo XLSX')]),
+                    style={'width': '90%', 'maxWidth': '320px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
+                        'textAlign': 'center', 'margin': '15px auto'},
                     multiple=False # Permitir o upload de vários arquivos
                 ),
                 #---------------------------------------------------- VISUALIZAR PASSO 1-------------------------------------------------------------------------------------
@@ -64,13 +67,16 @@ app.layout = html.Div(children=[
                     dcc.Download(id="download_csv"),
                     html.Img(id='wordcloud-image', style={'width': '50%', 'margin': 'auto', 'display': 'block'}),]),
                 #---------------------------------------------------- VISUALIZAR PASSO 2-------------------------------------------------------------------------------------
-                #html.Hr(),
-                html.H1("Passo 2: Atualizar a nuvem de palavras por uma lista", style={'margin': '20px auto','textAlign': 'center'}), 
+                html.H1("Passo 2: Filtrando a nuvem de palavras", style={'margin': '20px auto','textAlign': 'center'}), 
+                html.H1('Você pode melhorar a visualização da nuvem de palavras criada ao adicionar uma lista de palavras.',
+                    style=text_style),
+                html.H1('A nova nuvem apresenta somente as palavras dessa lista e a frequência em que elas aparecem no conjunto de tokens.',
+                    style={**text_style, **{'margin-bottom': '30px'}}),      
                 dcc.Textarea(id='input-lista', placeholder='Insira sua lista de palavras aqui...', style={'width': '50%', 'height': '100px', 'margin': 'auto', 'display': 'block'}),
-                html.Div(html.Button('Atualizar Nuvem', id='btn-atualizar-nuvem-lista', n_clicks=0, style={'margin': '15px', 'padding': '15px','fontSize': '15px', 'textAlign': 'center'}), style={'text-align': 'center'}),
+                html.Div(html.Button('Atualizar Nuvem', id='btn-atualizar-nuvem-lista', n_clicks=0, style={'margin': '30px', 'padding': '15px','fontSize': '15px', 'textAlign': 'center'}), style={'text-align': 'center'}),
                 html.Div(id='wordcloud-image-lista', style={'width': '50%', 'margin': 'auto', 'display': 'none'}),  
                 html.H1("Criado e atualizado por: TASSProject. Mais informações em: https://github.com/GabrielaNara/translating-soundscape-descriptors", style={'margin': '200px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
-                #html.Hr()
+                html.Hr()
             ])
         ]
     )

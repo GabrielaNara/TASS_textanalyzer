@@ -63,7 +63,7 @@ app.layout = html.Div(children=[
                 html.H1(children='Como requisito o arquivo deve ter o formato .xlsx e 1 coluna chamada text'
                         , style={'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
                 dcc.Upload(
-                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo CSV')]),
+                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo EXCEL')]),
                     style={'width': '90%', 'maxWidth': '300px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
                         'textAlign': 'center', 'margin': '20px auto'},
                     multiple=False # Permitir o upload de vários arquivos
