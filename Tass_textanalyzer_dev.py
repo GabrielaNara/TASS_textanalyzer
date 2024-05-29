@@ -10,7 +10,6 @@ import re
 
 # Variável global para armazenar os dados do arquivo CSV
 data = None
-#tokens_text = None
 tokens_text = "" 
 text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}
 
