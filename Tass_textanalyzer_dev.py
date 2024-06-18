@@ -6,18 +6,64 @@ import base64
 import io
 from wordcloud import WordCloud
 from collections import Counter
-import re  
+#import re  
+import spacy
 
 # Variável global para armazenar os dados do arquivo CSV
 data = None
 tokens_text = "" 
-text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}
+nlp = spacy.load("pt_core_news_sm", exclude=["ner"]) 
+
+# Estilos utilizados
+page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fundo-preto-abstrato-da-grade-digital_53876-97647.jpg")', 
+            'backgroundRepeat': 'no-repeat',  # Não repetir a imagem de fundo
+            'backgroundSize': 'cover',  # Cobrir todo o espaço disponível
+            'height': 'auto',  # Altura automática para cobrir o conteúdo
+            'minHeight': '100vh',  # Altura mínima de 100% da tela visível
+            'fontFamily': 'Montserrat', 
+            'color': 'white'}
+text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
+
+def convert_fem_to_masc(token):
+    if token.pos_ == "NOUN" or token.pos_ == "ADJ" and 'Gender=Fem' or token.pos_ == "NOUN" and 'Gender=Masc'  in token.morph:
+        lemma = token.lemma_.lower()
+        if lemma.endswith('a'):
+            return lemma[:-1] + 'o'
+        elif lemma.endswith('as'):
+            return lemma[:-2] + 'o'        
+        elif lemma.endswith('ã'):
+            return lemma[:-1] + 'o'
+        elif lemma.endswith('ãs'):
+            return lemma[:-2] + 'o'
+        elif lemma.endswith('ão'):
+            return lemma[:-2] + 'o'
+        elif lemma.endswith('inha'):
+            return lemma[:-4] + 'inho'       
+        elif lemma.endswith('inhas'):
+            return lemma[:-5] + 'inho'   
+        elif lemma.endswith('ona'):
+            return lemma[:-3] + 'ão'
+        elif lemma.endswith('onas'):
+            return lemma[:-4] + 'ão'   
+        elif lemma.endswith('esa'):
+            return lemma[:-3] + 'ês'
+        elif lemma.endswith('esas'):
+            return lemma[:-4] + 'ês'
+    return token.lemma_
 
 def clean_text(text):
-    stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aqueles', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'parque', 'praça', 'local', 'lugar', 'ponto', 'pois', 'porque']
-    letters = re.findall(r'\b[A-zÀ-úü]+\b', text.lower())
-    filtered_words = [word for word in letters if word not in stopwords_list]
+    stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'parque', 'praça', 'local', 'lugar', 'ponto', 'pois', 'porque']
+    #text = re.findall(r'\b[A-zÀ-úü]+\b', text.lower())
+    #filtered_words = [word for word in letters if word not in stopwords_list]
+    text = text.lower()
+    doc = nlp(text)
+    filtered_words  = []
     
+    for token in doc: # Converter substantivos femininos para masculinos
+        if token.is_alpha and token.text.lower() not in stopwords_list:
+            token_lemma = convert_fem_to_masc(token)
+            filtered_words.append(token_lemma)
+
     return filtered_words
 
 # Criar o aplicativo Dash
@@ -32,15 +78,7 @@ app.layout = html.Div(children=[
         href='https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap'
     ),
    html.Div(
-        style={
-            'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fundo-preto-abstrato-da-grade-digital_53876-97647.jpg")', 
-            'backgroundRepeat': 'no-repeat',  # Não repetir a imagem de fundo
-            'backgroundSize': 'cover',  # Cobrir todo o espaço disponível
-            'height': 'auto',  # Altura automática para cobrir o conteúdo
-            'minHeight': '100vh',  # Altura mínima de 100% da tela visível
-            'fontFamily': 'Montserrat', 
-            'color': 'white',
-        },
+        style=page_style,
         children=[  
             html.Div(children=[
                 html.Div(style={'height': '50px'}), 
@@ -67,14 +105,14 @@ app.layout = html.Div(children=[
                     html.Img(id='wordcloud-image', style={'width': '50%', 'margin': 'auto', 'display': 'block'}),]),
                 #---------------------------------------------------- VISUALIZAR PASSO 2-------------------------------------------------------------------------------------
                 html.H1("Passo 2: Filtrando a nuvem de palavras", style={'margin': '20px auto','textAlign': 'center'}), 
-                html.H1('Você pode melhorar a visualização da nuvem de palavras criada ao adicionar uma lista de palavras.',
+                html.H1('Você pode melhorar a visualização da nuvem de palavras ao adicionar uma lista de palavras.',
                     style=text_style),
                 html.H1('A nova nuvem apresenta somente as palavras dessa lista e a frequência em que elas aparecem no conjunto de tokens.',
                     style={**text_style, **{'margin-bottom': '30px'}}),      
                 dcc.Textarea(id='input-lista', placeholder='Insira sua lista de palavras aqui...', style={'width': '50%', 'height': '100px', 'margin': 'auto', 'display': 'block'}),
                 html.Div(html.Button('Atualizar Nuvem', id='btn-atualizar-nuvem-lista', n_clicks=0, style={'margin': '30px', 'padding': '15px','fontSize': '15px', 'textAlign': 'center'}), style={'text-align': 'center'}),
                 html.Div(id='wordcloud-image-lista', style={'width': '50%', 'margin': 'auto', 'display': 'none'}),  
-                html.H1("Criado e atualizado por: TASSProject. Mais informações em: https://github.com/GabrielaNara/translating-soundscape-descriptors", style={'margin': '200px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
+                html.H1("Criado e atualizado por: TASSProject. Mais informações em: https://github.com/GabrielaNara/TASS_textanalyzer", style={'margin': '200px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
                 html.Hr()
             ])
         ]
