@@ -7,7 +7,21 @@ import io
 from wordcloud import WordCloud
 from collections import Counter
 import spacy
+import subprocess
+import sys
 
+# Função para instalar o modelo SpaCy
+def download_spacy_model(model):
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+
+# Verificar e instalar o modelo SpaCy se necessário
+try:
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
+except OSError:
+    print("Modelo pt_core_news_sm não encontrado. Instalando...")
+    download_spacy_model("pt_core_news_sm")
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
+            
 # Variável global para armazenar os dados do arquivo CSV
 data = None
 tokens_text = "" 
@@ -23,6 +37,9 @@ page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fund
             'color': 'white'}
 text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
 
+def download_spacy_model(model):
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+            
 def convert_fem_to_masc(token):
     if token.pos_ == "NOUN" or token.pos_ == "ADJ" and 'Gender=Fem' or token.pos_ == "NOUN" and 'Gender=Masc'  in token.morph:
         lemma = token.lemma_.lower()
@@ -55,12 +72,10 @@ def clean_text(text):
     text = text.lower()
     doc = nlp(text)
     filtered_words  = []
-    
     for token in doc: # Converter substantivos femininos para masculinos
         if token.is_alpha and token.text.lower() not in stopwords_list:
             token_lemma = convert_fem_to_masc(token)
             filtered_words.append(token_lemma)
-
     return filtered_words
 
 # Criar o aplicativo Dash
