@@ -6,11 +6,12 @@ import base64
 import io
 from wordcloud import WordCloud
 from collections import Counter
-import re  
+import spacy
 
 # Variável global para armazenar os dados do arquivo CSV
 data = None
 tokens_text = "" 
+nlp = spacy.load("pt_core_news_sm", exclude=["ner"]) 
 
 # Estilos utilizados
 page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fundo-preto-abstrato-da-grade-digital_53876-97647.jpg")', 
@@ -22,10 +23,44 @@ page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fund
             'color': 'white'}
 text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
 
+def convert_fem_to_masc(token):
+    if token.pos_ == "NOUN" or token.pos_ == "ADJ" and 'Gender=Fem' or token.pos_ == "NOUN" and 'Gender=Masc'  in token.morph:
+        lemma = token.lemma_.lower()
+        if lemma.endswith('a'):
+            return lemma[:-1] + 'o'
+        elif lemma.endswith('as'):
+            return lemma[:-2] + 'o'        
+        elif lemma.endswith('ã'):
+            return lemma[:-1] + 'o'
+        elif lemma.endswith('ãs'):
+            return lemma[:-2] + 'o'
+        elif lemma.endswith('ão'):
+            return lemma[:-2] + 'o'
+        elif lemma.endswith('inha'):
+            return lemma[:-4] + 'inho'       
+        elif lemma.endswith('inhas'):
+            return lemma[:-5] + 'inho'   
+        elif lemma.endswith('ona'):
+            return lemma[:-3] + 'ão'
+        elif lemma.endswith('onas'):
+            return lemma[:-4] + 'ão'   
+        elif lemma.endswith('esa'):
+            return lemma[:-3] + 'ês'
+        elif lemma.endswith('esas'):
+            return lemma[:-4] + 'ês'
+    return token.lemma_
+
 def clean_text(text):
-    stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aqueles', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'parque', 'praça', 'local', 'lugar', 'ponto', 'pois', 'porque']
-    letters = re.findall(r'\b[A-zÀ-úü]+\b', text.lower())
-    filtered_words = [word for word in letters if word not in stopwords_list]
+    stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque']
+    text = text.lower()
+    doc = nlp(text)
+    filtered_words  = []
+    
+    for token in doc: # Converter substantivos femininos para masculinos
+        if token.is_alpha and token.text.lower() not in stopwords_list:
+            token_lemma = convert_fem_to_masc(token)
+            filtered_words.append(token_lemma)
+
     return filtered_words
 
 # Criar o aplicativo Dash
