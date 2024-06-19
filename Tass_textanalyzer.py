@@ -7,25 +7,22 @@ import io
 from wordcloud import WordCloud
 from collections import Counter
 import spacy
-import subprocess
-import sys
+import spacy.cli
+import multiprocessing
 
-# Função para instalar o modelo SpaCy
-def download_spacy_model(model):
-    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+def load_spacy_model(model):
+    try:
+        return spacy.load(model, exclude=["ner"])
+    except OSError:
+        spacy.cli.download(model)
+        return spacy.load(model, exclude=["ner"])
 
-# Verificar e instalar o modelo SpaCy se necessário
-try:
-    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
-except OSError:
-    print("Modelo pt_core_news_sm não encontrado. Instalando...")
-    download_spacy_model("pt_core_news_sm")
-    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
-            
+# Carregar o modelo SpaCy
+nlp = load_spacy_model("pt_core_news_sm")
+
 # Variável global para armazenar os dados do arquivo CSV
 data = None
 tokens_text = "" 
-nlp = spacy.load("pt_core_news_sm", exclude=["ner"]) 
 
 # Estilos utilizados
 page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fundo-preto-abstrato-da-grade-digital_53876-97647.jpg")', 
@@ -37,19 +34,11 @@ page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fund
             'color': 'white'}
 text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
 
-def download_spacy_model(model):
-    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
-
 def clean_text(text):
     stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque']
-    text = text.lower()
-    doc = nlp(text)
-    filtered_words  = []
-    for token in doc: # Converter substantivos femininos para masculinos
-        if token.is_alpha and token.text.lower() not in stopwords_list:
-            token_lemma = token.lemma_
-            filtered_words.append(token_lemma)
-    return filtered_words
+    doc = nlp(text.lower()) 
+    filtered_words = [token.lemma_ for token in doc if token.is_alpha and token.text.lower() not in stopwords_list]
+    return ' '.join(filtered_words)
 
 # Criar o aplicativo Dash
 app = dash.Dash(__name__)
@@ -113,29 +102,29 @@ def update_output(contents, filename):
     global tokens_text  
 
     if contents is not None:
-        # Ler o conteúdo do arquivo
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
-
         try:
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
             data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-        except UnicodeDecodeError:
-            blocks = decoded.split('"\n"')
-            # Criar uma lista de dicionários para os dados
-            data = []
-            for block in blocks:
-                text = block.replace('"', '').strip()  
-                data.append({'text': text})
-            df = pd.DataFrame(data)
+
+        except Exception as e:
+            # Tratamento genérico de erros
+            return html.Div([
+                html.H3('Ocorreu um erro ao processar o arquivo:'),
+                html.P(str(e))
+            ]), None
         
-        # Processar os dados 
-        data['tokens'] = data['text'].apply(lambda x: ', '.join(clean_text(x)))
+        # Processar os dados em paralelo
+        num_cores = multiprocessing.cpu_count()
+        with multiprocessing.Pool(processes=num_cores) as pool:
+            tokens_list = pool.map(clean_text, data['text'])
+        data['tokens'] = tokens_list
 
         # Gerar a nuvem de palavras
         tokens_text = ' '.join(data['tokens'])
         wordcloud = WordCloud(width=600, height=300, background_color='white').generate(tokens_text)
         img = io.BytesIO()
-        wordcloud.to_image().save(img, format='PNG')
+        wordcloud.to_image().save(img, format='JPEG')
         img.seek(0)
         
         # Exibir as 2 primeiras linhas do DataFrame em uma tabela HTML dentro de um quadro
@@ -151,7 +140,7 @@ def update_output(contents, filename):
         ])
         
         # Retornar a exibição do DataFrame e a nuvem de palavras
-        return table_output, 'data:image/png;base64,' + base64.b64encode(img.getvalue()).decode()
+        return table_output, 'data:image/jpeg;base64,' + base64.b64encode(img.getvalue()).decode()
     else:
         return None, None
 
@@ -172,7 +161,7 @@ def show_upload_output(contents):
     [Input("btn_csv", "n_clicks")]
 )
 def download_csv(n_clicks):
-    global data  # Use a variável global 'data'
+    global data  
     if n_clicks is not None and data is not None:
         # Crie um buffer de memória para armazenar o CSV
         buffer = io.StringIO()
@@ -181,19 +170,8 @@ def download_csv(n_clicks):
         # Volte para o início do buffer
         buffer.seek(0)
         # Retorne o arquivo CSV como uma resposta para download
-        return dict(content=buffer.getvalue(), filename="tabela.csv")
-
-# Rota para baixar o arquivo CSV
-@app.server.route("/download_csv")
-def download_csv_route():
-    # Chame a função de callback para obter os dados do CSV
-    csv_data = download_csv(1)["content"]
-    return flask.send_file(
-        io.BytesIO(csv_data.encode("utf-8")),
-        mimetype="text/csv",
-        attachment_filename="tabela.csv",
-        as_attachment=True
-    )
+        csv_data = buffer.getvalue()
+        return dict(content=csv_data, filename="tabela.csv")
 
 # MOSTRAR A NUVEM GERAL APENAS SE O CSV É INSERIDO
 @app.callback(Output('wordcloud-image', 'style'),
@@ -230,9 +208,9 @@ def update_wordcloud_by_list(n_clicks, lista):
         # Criar a nuvem de palavras com base no texto filtrado
         wordcloud = WordCloud(width=600, height=300, background_color='white').generate(filtered_text)
         img = io.BytesIO()
-        wordcloud.to_image().save(img, format='PNG')
+        wordcloud.to_image().save(img, format='JPEG')
         img.seek(0)
-        wordcloud_image = html.Img(src='data:image/png;base64,' + base64.b64encode(img.getvalue()).decode(), style={'width': '100%', 'margin': 'auto', 'display': 'block'})
+        wordcloud_image = html.Img(src='data:image/jpeg;base64,' + base64.b64encode(img.getvalue()).decode(), style={'width': '100%', 'margin': 'auto', 'display': 'block'})
         
         return [wordcloud_image,table_frequencia ]
     else:
