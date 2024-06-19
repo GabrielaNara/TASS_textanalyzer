@@ -4,9 +4,23 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import base64
 import io
-import re
 from wordcloud import WordCloud
 from collections import Counter
+import spacy
+import subprocess
+import sys
+
+# Função para instalar o modelo SpaCy
+def download_spacy_model(model):
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+
+# Verificar e instalar o modelo SpaCy se necessário
+try:
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
+except OSError:
+    print("Modelo pt_core_news_sm não encontrado. Instalando...")
+    download_spacy_model("pt_core_news_sm")
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
             
 # Variável global para armazenar os dados do arquivo CSV
 data = None
@@ -23,10 +37,18 @@ page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fund
             'color': 'white'}
 text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
 
+def download_spacy_model(model):
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+
 def clean_text(text):
     stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque']
-    letters = re.findall(r'\b[A-zÀ-úü]+\b', text.lower())
-    filtered_words = [word for word in letters if word not in stopwords_list]
+    text = text.lower()
+    doc = nlp(text)
+    filtered_words  = []
+    for token in doc: # Converter substantivos femininos para masculinos
+        if token.is_alpha and token.text.lower() not in stopwords_list:
+            token_lemma = token.lemma_
+            filtered_words.append(token_lemma)
     return filtered_words
 
 # Criar o aplicativo Dash
@@ -82,14 +104,7 @@ app.layout = html.Div(children=[
     )
 ])
 
-# Callback para carregar os dados do arquivo CSV
-def load_data(contents):
-    global data
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string).decode('utf-8')
-    data = pd.read_csv(io.StringIO(decoded))
-
-# Callback para carregar o arquivo e exibir o DataFrame
+# Callback para carregar os dados do arquivo CSV e exibir o DataFrame
 @app.callback([Output('output-data-upload', 'children'), Output('wordcloud-image', 'src')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename')])
@@ -101,16 +116,20 @@ def update_output(contents, filename):
         # Ler o conteúdo do arquivo
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
+
+        try:
+            data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+        except UnicodeDecodeError:
+            blocks = decoded.split('"\n"')
+            # Criar uma lista de dicionários para os dados
+            data = []
+            for block in blocks:
+                text = block.replace('"', '').strip()  
+                data.append({'text': text})
+            df = pd.DataFrame(data)
         
-        # Carregar os dados e organizando o dataframe
-        data = pd.read_excel(io.BytesIO(decoded))
-        # Criando a coluna tokens 
-        strg = []
-        for i in data['text']:
-            words = clean_text(i)
-            strg += [", ".join(words)]
-        data['tokens'] = strg
-        data = data[['text', 'tokens']]
+        # Processar os dados 
+        data['tokens'] = data['text'].apply(lambda x: ', '.join(clean_text(x)))
 
         # Gerar a nuvem de palavras
         tokens_text = ' '.join(data['tokens'])
