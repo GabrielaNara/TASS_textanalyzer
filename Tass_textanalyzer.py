@@ -41,7 +41,7 @@ def download_spacy_model(model):
     subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
             
 def convert_fem_to_masc(token):
-    if token.pos_ == "NOUN" or token.pos_ == "ADJ" and 'Gender=Fem' or token.pos_ == "NOUN" and 'Gender=Masc'  in token.morph:
+    if (token.pos_ == "NOUN" or token.pos_ == "ADJ") and ('Gender=Fem' in token.morph or 'Gender=Masc' in token.morph):
         lemma = token.lemma_.lower()
         if lemma.endswith('a'):
             return lemma[:-1] + 'o'
