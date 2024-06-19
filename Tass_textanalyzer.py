@@ -39,7 +39,8 @@ text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','f
 
 def download_spacy_model(model):
     subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
-            
+
+"""           
 def convert_fem_to_masc(token):
     if (token.pos_ == "NOUN" or token.pos_ == "ADJ") and ('Gender=Fem' in token.morph or 'Gender=Masc' in token.morph):
         lemma = token.lemma_.lower()
@@ -66,7 +67,7 @@ def convert_fem_to_masc(token):
         elif lemma.endswith('esas'):
             return lemma[:-4] + 'ês'
     return token.lemma_
-
+"""
 def clean_text(text):
     stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque']
     text = text.lower()
@@ -74,7 +75,8 @@ def clean_text(text):
     filtered_words  = []
     for token in doc: # Converter substantivos femininos para masculinos
         if token.is_alpha and token.text.lower() not in stopwords_list:
-            token_lemma = convert_fem_to_masc(token)
+            #token_lemma = convert_fem_to_masc(token)
+            token_lemma = token.lemma_
             filtered_words.append(token_lemma)
     return filtered_words
 
