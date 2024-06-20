@@ -8,21 +8,17 @@ from wordcloud import WordCloud
 from collections import Counter
 import spacy
 import spacy.cli
-import multiprocessing
+import concurrent.futures
 
-def load_spacy_model(model):
-    try:
-        return spacy.load(model, exclude=["ner"])
-    except OSError:
-        spacy.cli.download(model)
-        return spacy.load(model, exclude=["ner"])
-
-# Carregar o modelo SpaCy
-nlp = load_spacy_model("pt_core_news_sm")
+try:
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
+except OSError:
+    spacy.cli.download("pt_core_news_sm")
+    nlp = spacy.load("pt_core_news_sm", exclude=["ner"])
 
 # Variável global para armazenar os dados do arquivo CSV
 data = None
-tokens_text = "" 
+tokens_list = ""
 
 # Estilos utilizados
 page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fundo-preto-abstrato-da-grade-digital_53876-97647.jpg")', 
@@ -36,8 +32,10 @@ text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','f
 
 def clean_text(text):
     stopwords_list = ['a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 'eles', 'em', 'entre', 'era', 'eram', 'éramos', 'essa', 'essas', 'esse', 'esses', 'esta', 'está', 'estamos', 'estão', 'estar', 'estas', 'estava', 'estavam', 'estávamos', 'este', 'esteja', 'estejam', 'estejamos', 'estes', 'esteve', 'estive', 'estivemos', 'estiver', 'estivera', 'estiveram', 'estivéramos', 'estiverem', 'estivermos', 'estivesse', 'estivessem', 'estivéssemos', 'estou', 'eu', 'foi', 'fomos', 'for', 'fora', 'foram', 'fôramos', 'forem', 'formos', 'fosse', 'fossem', 'fôssemos', 'fui', 'há', 'haja', 'hajam', 'hajamos', 'hão', 'havemos', 'haver', 'hei', 'houve', 'houvemos', 'houver', 'houvera', 'houverá', 'houveram', 'houvéramos', 'houverão', 'houverei', 'houverem', 'houveremos', 'houveria', 'houveriam', 'houveríamos', 'houvermos', 'houvesse', 'houvessem', 'houvéssemos', 'isso', 'isto', 'já', 'lhe', 'lhes', 'mais', 'mas', 'me', 'mesmo', 'meu', 'meus', 'minha', 'minhas', 'muito', 'na', 'não', 'nas', 'nem', 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sejam', 'sejamos', 'sem', 'ser', 'será', 'serão', 'serei', 'seremos', 'seria', 'seriam', 'seríamos', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 'também', 'te', 'tem', 'tém', 'temos', 'tenha', 'tenham', 'tenhamos', 'tenho', 'terá', 'terão', 'terei', 'teremos', 'teria', 'teriam', 'teríamos', 'teu', 'teus', 'teve', 'tinha', 'tinham', 'tínhamos', 'tive', 'tivemos', 'tiver', 'tivera', 'tiveram', 'tivéramos', 'tiverem', 'tivermos', 'tivesse', 'tivessem', 'tivéssemos', 'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque']
+    filtered_words = []
     doc = nlp(text.lower()) 
     filtered_words = [token.lemma_ for token in doc if token.is_alpha and token.text.lower() not in stopwords_list]
+    #return filtered_words
     return ' '.join(filtered_words)
 
 # Criar o aplicativo Dash
@@ -72,6 +70,7 @@ app.layout = html.Div(children=[
                 ),
                 #---------------------------------------------------- VISUALIZAR PASSO 1-------------------------------------------------------------------------------------
                 html.Div(id='output-upload', style={'display': 'none'}, children=[
+                    html.H2(children='Processando... aguarde', style={'margin': '10px auto','marginLeft': '250px','fontSize': '20px'}),
                     html.H2(children='Pré-visualizar Lematização do texto', style={'margin': '10px auto','marginLeft': '250px','fontSize': '20px'}),
                     html.Div(id='output-data-upload', style={'margin': '10px auto','marginLeft': '250px','marginRight': '250px','padding': '20px', 'border': '1px solid #ccc'}),
                     html.Button("Download CSV", id="btn_csv", style={'margin': '10px auto', 'marginLeft': '250px','padding': '10px', 'border': '1px solid #ccc'}),
@@ -99,7 +98,7 @@ app.layout = html.Div(children=[
               [State('upload-data', 'filename')])
 def update_output(contents, filename):
     global data  
-    global tokens_text  
+    global tokens_list
 
     if contents is not None:
         try:
@@ -107,22 +106,19 @@ def update_output(contents, filename):
             decoded = base64.b64decode(content_string)
             data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-        except Exception as e:
-            # Tratamento genérico de erros
+        except Exception as e: # Tratamento genérico de erros    
             return html.Div([
                 html.H3('Ocorreu um erro ao processar o arquivo:'),
                 html.P(str(e))
             ]), None
-        
-        # Processar os dados em paralelo
-        num_cores = multiprocessing.cpu_count()
-        with multiprocessing.Pool(processes=num_cores) as pool:
-            tokens_list = pool.map(clean_text, data['text'])
+    
+        # Process data in parallel using concurrent.futures
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+                tokens_list = list(executor.map(clean_text, data['text']))
         data['tokens'] = tokens_list
 
         # Gerar a nuvem de palavras
-        tokens_text = ' '.join(data['tokens'])
-        wordcloud = WordCloud(width=600, height=300, background_color='white').generate(tokens_text)
+        wordcloud = WordCloud(width=600, height=300, background_color='white').generate(' '.join(tokens_list))
         img = io.BytesIO()
         wordcloud.to_image().save(img, format='JPEG')
         img.seek(0)
@@ -187,25 +183,26 @@ def update_image_style(contents):
               [Input('btn-atualizar-nuvem-lista', 'n_clicks')],
               [State('input-lista', 'value')])
 def update_wordcloud_by_list(n_clicks, lista):
-    global tokens_text  
+    global tokens_list
 
-    if tokens_text and n_clicks > 0 and lista:
-        # Obter palavras da lista e filtrar texto
-        words = clean_text(lista)
-        filtered_text = ' '.join([word for word in clean_text(tokens_text) if word in words])
+    if tokens_list  and n_clicks > 0 and lista:
+        filtered_text = []
+        for tokens_string in tokens_list:
+            tokens = tokens_string.split()
+            filtered_text.append([token for token in tokens if token in lista])
+        flat_filtered_tokens = [token for sublist in filtered_text for token in sublist]
 
         # Contagem das palavras no texto filtrado
-        word_counts = Counter(filtered_text.split())
+        word_counts = Counter(flat_filtered_tokens)
         top_10_words = word_counts.most_common(10)
         top_words_list = [html.Li(f"{word}: {count} vezes", style={'color': 'white'}) for word, count in top_10_words]
         
         # Construção da tabela com as 10 palavras mais frequentes
-        table_frequencia = html.Div([
-            html.H3('10 palavras mais frequentes:'),
-            html.Ul(top_words_list)
-        ])
+        table_frequencia = html.Div([   html.H3('10 palavras mais frequentes:'),        
+                                     html.Ul(top_words_list)  ])
 
         # Criar a nuvem de palavras com base no texto filtrado
+        filtered_text = ' '.join(flat_filtered_tokens)
         wordcloud = WordCloud(width=600, height=300, background_color='white').generate(filtered_text)
         img = io.BytesIO()
         wordcloud.to_image().save(img, format='JPEG')
