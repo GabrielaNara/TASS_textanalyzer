@@ -50,6 +50,12 @@ def clean_text(text):
                 filtered_words.append(token.text)  # Repetir a palavra para outras POS
     return ' '.join(filtered_words)
 
+def clean_text_2(text):
+    words = text.lower().split()
+    filtered_words = [word for word in words if word not in stopwords_set]
+    
+    return ' '.join(filtered_words)
+
 # Criar o aplicativo Dash
 app = dash.Dash(__name__)
 server = app.server
@@ -71,12 +77,18 @@ app.layout = html.Div(children=[
                 #---------------------------------------------------- PASSO 1-------------------------------------------------------------------------------------
                 html.H1(children='Passo 1: Processamento de Linguagem Natural', style={'margin': '20px auto','textAlign': 'center'}),
                 html.H1(children='Requisito: O arquivo deve ter o formato .TXT', style=text_style), 
-                html.H1(children='O texto passará pelo processo de lematização, onde cada palavra é reduzida a sua forma básica do dicionário, chamada de Lema. A operação é realizada de acordo com o modelo para a língua portuguesa da bilbioteca Spacy do Python. Os verbos são convertidos ao infinitivo, os substantivos ao singular e os adjetivos ao masculino singular.', 
-                        style=text_style),
-                html.H1(children='O processo pode levar segundos ou minutos, a depender do tamanho da base de dados. Quando finalizado, você poderá visualizar a lematização em algumas palavras do texto, visualizar a nuvem de palavras e baixar o arquivo lematizado em formato .txt.', 
+                html.H1(children='O texto passará pelo processo de lematização, onde cada palavra é reduzida a sua forma básica do dicionário, chamada de Lema. A operação é realizada de acordo com o modelo para a língua portuguesa da bilbioteca Spacy do Python. Os verbos são convertidos ao infinitivo, os substantivos ao singular e os adjetivos ao masculino singular. Quando finalizado, você poderá visualizar a lematização em algumas palavras do texto, visualizar a nuvem de palavras e baixar o arquivo lematizado em formato .txt. ', 
                         style=text_style),
                 html.H1(children='Exemplo: Gatos --> gato, gata --> gato, lojão --> loja, ladrão --> ladrão, gatinhos --> gatinho, golfinho --> golfinho', 
-                        style={**text_style, 'margin-bottom': '30px'}),                        
+                        style={**text_style, 'margin-bottom': '30px'}),  
+                html.H1(children='O processo de lematização pode demorar a depender do tamanho da base de dados. Nesses casos, recomenda-se uma filtragem simples por Tokenização. Escolha entre as 2 opções abaixo:', 
+                        style=text_style),
+                html.Div(style={'display': 'flex','justifyContent': 'center','alignItems': 'center' },
+                        children=[dcc.RadioItems(id='cleaning-function',options=[
+                                    {'label': 'Lematização (processo completo)', 'value': 'clean_text'},
+                                    {'label': 'Tokenização (processo simples)', 'value': 'clean_text_2'}],
+                                value='clean_text',  # default value
+                                labelStyle={'display': 'block', 'margin': '10px auto', 'fontSize': '20px'})]),                    
                 dcc.Upload(
                     id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo .TXT')]),
                     style={'width': '90%', 'maxWidth': '320px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
@@ -110,9 +122,9 @@ app.layout = html.Div(children=[
 
 # Callback para carregar os dados do arquivo CSV e exibir o DataFrame
 @app.callback([Output('output-data-upload', 'children'), Output('wordcloud-image', 'src')],
-              [Input('upload-data', 'contents')],
+              [Input('upload-data', 'contents'), Input('cleaning-function', 'value')],
               [State('upload-data', 'filename')])
-def update_output(contents, filename):
+def update_output(contents, selected_cleaning_function, filename):
     global tokens_list
 
     if contents is not None:
@@ -128,8 +140,17 @@ def update_output(contents, filename):
                     html.P('O arquivo carregado não contém texto válido para processamento.')
                 ]), None
             
+            # Selecionar a função de limpeza com base na escolha do usuário
+            if selected_cleaning_function == 'clean_text':
+                cleaning_function = clean_text
+            else:
+                cleaning_function = clean_text_2
+
+            # Aplicar a função de limpeza selecionada ao conteúdo do arquivo
+            tokens_list = [cleaning_function(line.strip()) for line in decoded.splitlines() if line.strip()]
+
             # Aplicar a função clean_text ao conteúdo do arquivo
-            tokens_list = [clean_text(line.strip()) for line in decoded.splitlines() if line.strip()]
+            # tokens_list = [clean_text(line.strip()) for line in decoded.splitlines() if line.strip()]
 
             # Verificar se há tokens após o processamento
             if not tokens_list or all(len(token) == 0 for token in tokens_list):
