@@ -29,7 +29,7 @@ page_style = {'backgroundImage': 'url("https://img.freepik.com/fotos-gratis/fund
             'minHeight': '100vh',  # Altura mínima de 100% da tela visível
             'fontFamily': 'Montserrat', 
             'color': 'white'}
-text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '15px','fontFamily': 'Roboto'}
+text_style = {'margin': '10px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto','whiteSpace': 'pre-wrap','width': '80%','color': '#A9A9A9'}
 
 stopwords_set = {'a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#s', 'aquilo', 'as', 'às', 'até', 'com', 
 'como', 'da', 'das', 'de', 'dela', 'delas', 'dele', 'deles', 'depois', 'do', 'dos', 'e', 'é', 'ela', 'elas', 'ele', 
@@ -70,15 +70,18 @@ app.layout = html.Div(children=[
                 html.Div(style={'height': '30px'}), 
                 #---------------------------------------------------- PASSO 1-------------------------------------------------------------------------------------
                 html.H1(children='Passo 1: Processamento de Linguagem Natural', style={'margin': '20px auto','textAlign': 'center'}),
-                html.H1(children='O arquivo deve ter o formato .TXT', 
-                        style=text_style), 
-                html.H1(children='O processamento de linguagem natural é feito com os dos dados dessa coluna, gerando uma outra coluna chamada tokens, que são as palavras relevantes do texto.', 
-                        style={**text_style, **{'margin-bottom': '30px'}}),  
+                html.H1(children='Requisito: O arquivo deve ter o formato .TXT', style=text_style), 
+                html.H1(children='O texto passará pelo processo de lematização, onde cada palavra é reduzida a sua forma básica do dicionário, chamada de Lema. A operação é realizada de acordo com o modelo para a língua portuguesa da bilbioteca Spacy do Python. Os verbos são convertidos ao infinitivo, os substantivos ao singular e os adjetivos ao masculino singular.', 
+                        style=text_style),
+                html.H1(children='O processo pode levar segundos ou minutos, a depender do tamanho da base de dados. Quando finalizado, você poderá visualizar a lematização em algumas palavras do texto, visualizar a nuvem de palavras e baixar o arquivo lematizado em formato .txt.', 
+                        style=text_style),
+                html.H1(children='Exemplo: Gatos --> gato, gata --> gato, lojão --> loja, ladrão --> ladrão, gatinhos --> gatinho, golfinho --> golfinho', 
+                        style={**text_style, 'margin-bottom': '30px'}),                        
                 dcc.Upload(
                     id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo .TXT')]),
                     style={'width': '90%', 'maxWidth': '320px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
                         'textAlign': 'center', 'margin': '15px auto'},
-                    multiple=False # Permitir o upload de vários arquivos
+                    multiple=False 
                 ),
                 #---------------------------------------------------- VISUALIZAR PASSO 1-------------------------------------------------------------------------------------
                 html.Div(id='output-upload', style={'display': 'none'}, children=[
@@ -88,15 +91,17 @@ app.layout = html.Div(children=[
                     dcc.Download(id="download_txt"),
                     html.Img(id='wordcloud-image', style={'width': '50%', 'margin': 'auto', 'display': 'block'}),]),
                 #---------------------------------------------------- VISUALIZAR PASSO 2-------------------------------------------------------------------------------------
-                html.H1("Passo 2: Filtrando a nuvem de palavras", style={'margin': '20px auto','textAlign': 'center'}), 
-                html.H1('Você pode melhorar a visualização da nuvem de palavras ao adicionar uma lista de palavras.',
+                html.H1("Passo 2: Filtrando a nuvem de palavras", style={'margin': '100px auto 20px','textAlign': 'center'}), 
+                html.H1(children='Requisito: Finalize a etapa 1', style=text_style), 
+                html.H1('Você pode melhorar a visualização da nuvem de palavras ao filtrar somente palavras específicas. Para isso, adicione palavras separadas por vírgula na caixa de texto abaixo. Por exemplo, você pode utilizar Adjetivos e Advérbios de caráter positivo ou negativo que expressam a análise ou satisfação das pessoas. Ao clicar no botão Atualizar Nuvem, ficará visível uma nova nuvem de palavras filtrada, e abaixo da nuvem a quantidade de vezes que as 10 palavras mais frequentes apareceram no texto.',
                     style=text_style),
-                html.H1('A nova nuvem apresenta somente as palavras dessa lista e a frequência em que elas aparecem no conjunto de tokens.',
-                    style={**text_style, **{'margin-bottom': '30px'}}),      
+                html.H1('Exemplo: quente, frio, bom, ruim, agradável, amigável, excelente, péssimo',
+                    style={**text_style, **{'margin-bottom': '30px'}}),  
                 dcc.Textarea(id='input-lista', placeholder='Insira sua lista de palavras aqui...', style={'width': '50%', 'height': '100px', 'margin': 'auto', 'display': 'block'}),
                 html.Div(html.Button('Atualizar Nuvem', id='btn-atualizar-nuvem-lista', n_clicks=0, style={'margin': '30px', 'padding': '15px','fontSize': '15px', 'textAlign': 'center'}), style={'text-align': 'center'}),
                 html.Div(id='wordcloud-image-lista', style={'width': '50%', 'margin': 'auto', 'display': 'none'}),  
-                html.H1("Criado e atualizado por: TASSProject. Mais informações em: https://github.com/GabrielaNara/TASS_textanalyzer", style={'margin': '200px auto','textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
+                html.H1("O TASS Analyzer é uma iniciativa acadêmica para processamento rápido de textos na língua portuguesa.Para mais informações, ou em caso de dúvidas e sugestões, acesse: https://github.com/GabrielaNara/TASS_textanalyzer", 
+                        style={'margin': '200px auto', 'textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
                 html.Hr()
             ])
         ]
@@ -157,7 +162,7 @@ def update_output(contents, filename):
                 html.P(str(e))
             ]), None
     else:
-        return html.Div(['Arraste e solte ou ', html.A('selecione um arquivo TXT')]), None
+        return html.Div(['Aguarde o processamento...']), None
 
 # Callback para mostrar a parte do layout após o upload do arquivo
 @app.callback(
