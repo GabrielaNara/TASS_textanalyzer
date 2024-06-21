@@ -10,7 +10,7 @@ import spacy
 import spacy.cli
 import concurrent.futures
 
-#pandas==2.2.1
+#ADICIONAR NA LISTA DE REQUIRMENTS pandas==2.2.1
 
 def load_spacy_model(model_name="pt_core_news_sm"):
     try:
