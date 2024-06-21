@@ -81,13 +81,13 @@ app.layout = html.Div(children=[
                         style=text_style),
                 html.H1(children='Exemplo: Gatos --> gato, gata --> gato, lojão --> loja, ladrão --> ladrão, gatinhos --> gatinho, golfinho --> golfinho', 
                         style={**text_style, 'margin-bottom': '30px'}),  
-                html.H1(children='O processo de lematização pode demorar a depender do tamanho da base de dados. Nesses casos, recomenda-se uma filtragem simples por Tokenização. Escolha entre as 2 opções abaixo:', 
+                html.H1(children='O processo de lematização pode demorar a depender do tamanho da base de dados. Nesses casos, recomenda-se uma filtragem simples por Tokenização, onde são eliminados caracteres e palavras sem significância, como "a", "ao", "vc". Escolha entre as 2 opções abaixo:', 
                         style=text_style),
                 html.Div(style={'display': 'flex','justifyContent': 'center','alignItems': 'center' },
                         children=[dcc.RadioItems(id='cleaning-function',options=[
-                                    {'label': 'Lematização (processo completo)', 'value': 'clean_text'},
-                                    {'label': 'Tokenização (processo simples)', 'value': 'clean_text_2'}],
-                                value='clean_text',  # default value
+                                    {'label': 'Tokenização (processo simples)', 'value': 'clean_text_2'},
+                                    {'label': 'Lematização (processo completo)', 'value': 'clean_text'}],
+                                value='clean_text_2',  # default value
                                 labelStyle={'display': 'block', 'margin': '10px auto', 'fontSize': '20px'})]),                    
                 dcc.Upload(
                     id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo .TXT')]),
@@ -113,7 +113,7 @@ app.layout = html.Div(children=[
                 html.Div(html.Button('Atualizar Nuvem', id='btn-atualizar-nuvem-lista', n_clicks=0, style={'margin': '30px', 'padding': '15px','fontSize': '15px', 'textAlign': 'center'}), style={'text-align': 'center'}),
                 html.Div(id='wordcloud-image-lista', style={'width': '50%', 'margin': 'auto', 'display': 'none'}),  
                 html.H1("O TASS Analyzer é uma iniciativa acadêmica para processamento rápido de textos na língua portuguesa.Para mais informações, ou em caso de dúvidas e sugestões, acesse: https://github.com/GabrielaNara/TASS_textanalyzer", 
-                        style={'margin': '200px auto', 'textAlign': 'center', 'fontSize': '20px','fontFamily': 'Roboto'}), 
+                        style={'margin': '200px auto', 'textAlign': 'center', 'fontSize': '25px','fontFamily': 'Roboto'}), 
                 html.Hr()
             ])
         ]
@@ -226,23 +226,28 @@ def update_wordcloud_by_list(n_clicks, lista):
     global tokens_list
 
     if tokens_list  and n_clicks > 0 and lista:
+        lista_set = set(lista.split())
+        word_counter = Counter()
+
         filtered_text = []
         for tokens_string in tokens_list:
             tokens = tokens_string.split()
-            filtered_text.append([token for token in tokens if token in lista])
-        flat_filtered_tokens = [token for sublist in filtered_text for token in sublist]
+            filtered_tokens = [token for token in tokens if token in lista_set]
+            word_counter.update(filtered_tokens)
 
-        # Contagem das palavras no texto filtrado
-        word_counts = Counter(flat_filtered_tokens)
-        top_10_words = word_counts.most_common(10)
+        # Extraindo as palavras únicas que estão na lista original
+        unique_filtered_tokens = [word for word in word_counter if word in lista_set]
+
+        # Obtendo as 10 palavras mais comuns
+        top_10_words = word_counter.most_common(10)
         top_words_list = [html.Li(f"{word}: {count} vezes", style={'color': 'white'}) for word, count in top_10_words]
-        
+
         # Construção da tabela com as 10 palavras mais frequentes
         table_frequencia = html.Div([   html.H3('10 palavras mais frequentes:'),        
                                      html.Ul(top_words_list)  ])
 
         # Criar a nuvem de palavras com base no texto filtrado
-        filtered_text = ' '.join(flat_filtered_tokens)
+        filtered_text = ' '.join(unique_filtered_tokens)
         wordcloud = WordCloud(width=600, height=300, background_color='white').generate(filtered_text)
         img = io.BytesIO()
         wordcloud.to_image().save(img, format='JPEG', quality=80)
