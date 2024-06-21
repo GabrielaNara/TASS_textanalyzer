@@ -1,16 +1,12 @@
 import dash
-from dash import dcc, html, dash_table
+from dash import dcc, html
 from dash.dependencies import Input, Output, State
-import pandas as pd
 import base64
 import io
 from wordcloud import WordCloud
 from collections import Counter
 import spacy
 import spacy.cli
-import concurrent.futures
-
-#pandas==2.2.1
 
 def load_spacy_model(model_name="pt_core_news_sm"):
     try:
@@ -23,7 +19,6 @@ def load_spacy_model(model_name="pt_core_news_sm"):
 nlp = load_spacy_model()
 
 # Variável global para armazenar os dados do arquivo CSV
-data = None
 tokens_list = ""
 
 # Estilos utilizados
@@ -42,11 +37,17 @@ stopwords_set = {'a', 'à', 'ao', 'aos', 'aquela', 'aquelas', 'aquele', 'aquele#
 'no', 'nos', 'nós', 'nossa', 'nossas', 'nosso', 'nossos', 'num', 'numa', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 
 'pelo', 'pelos', 'por', 'qual', 'quando', 'que', 'quem', 'são', 'se', 'seja', 'sem', 'seu', 'seus', 'só', 'somos', 'sou', 'sua', 'suas', 
 'também', 'te', 'tem', 'tém', 'teu', 'teus',  'tu', 'tua', 'tuas', 'um', 'uma', 'você', 'vocês', 'vos', "'", 'pra', 'eh', 'vcs', 'lá', 'né', 'q', 'o', 'tá', 'co', 't', 's', 'rt', 'pq', 
-'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque'}
+'ta', 'tô', 'ihh', 'ih', 'otc', 'vc', 'https', 'n', 'pois', 'porque',"b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "w", "x", "y", "z"}
 
 def clean_text(text):
     doc = nlp(text.lower())
-    filtered_words = [token.lemma_ for token in doc if token.is_alpha and token.pos_ in ['ADJ', 'NOUN'] and token.text.lower() not in stopwords_set]
+    filtered_words = []
+    for token in doc:
+        if token.is_alpha and token.text.lower() not in stopwords_set:
+            if token.pos_ in ['ADJ', 'NOUN']:  # Lematizar apenas adjetivos e substantivos
+                filtered_words.append(token.lemma_)
+            else:
+                filtered_words.append(token.text)  # Repetir a palavra para outras POS
     return ' '.join(filtered_words)
 
 # Criar o aplicativo Dash
@@ -65,27 +66,26 @@ app.layout = html.Div(children=[
         children=[  
             html.Div(children=[
                 html.Div(style={'height': '50px'}), 
-                html.H1(children='Text Analyzer by TASS', style={'margin': '20px auto','textAlign': 'center', 'fontSize': '48px'}), 
+                html.H1(children='TASS Analyzer', style={'margin': '20px auto','textAlign': 'center', 'fontSize': '48px'}), 
                 html.Div(style={'height': '30px'}), 
                 #---------------------------------------------------- PASSO 1-------------------------------------------------------------------------------------
                 html.H1(children='Passo 1: Processamento de Linguagem Natural', style={'margin': '20px auto','textAlign': 'center'}),
-                html.H1(children='O arquivo deve ter o formato .xlsx e 1 coluna chamada text.', 
+                html.H1(children='O arquivo deve ter o formato .TXT', 
                         style=text_style), 
                 html.H1(children='O processamento de linguagem natural é feito com os dos dados dessa coluna, gerando uma outra coluna chamada tokens, que são as palavras relevantes do texto.', 
                         style={**text_style, **{'margin-bottom': '30px'}}),  
                 dcc.Upload(
-                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo XLSX')]),
+                    id='upload-data',children=html.Div(['Arraste ou ', html.A('selecione um arquivo .TXT')]),
                     style={'width': '90%', 'maxWidth': '320px', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
                         'textAlign': 'center', 'margin': '15px auto'},
                     multiple=False # Permitir o upload de vários arquivos
                 ),
                 #---------------------------------------------------- VISUALIZAR PASSO 1-------------------------------------------------------------------------------------
                 html.Div(id='output-upload', style={'display': 'none'}, children=[
-                    html.H2(children='Processando... aguarde', style={'margin': '10px auto','marginLeft': '250px','fontSize': '20px'}),
                     html.H2(children='Pré-visualizar Lematização do texto', style={'margin': '10px auto','marginLeft': '250px','fontSize': '20px'}),
                     html.Div(id='output-data-upload', style={'margin': '10px auto','marginLeft': '250px','marginRight': '250px','padding': '20px', 'border': '1px solid #ccc'}),
-                    html.Button("Download CSV", id="btn_csv", style={'margin': '10px auto', 'marginLeft': '250px','padding': '10px', 'border': '1px solid #ccc'}),
-                    dcc.Download(id="download_csv"),
+                    html.Button("Download TXT Lematizado", id="btn_txt", style={'margin': '10px auto', 'marginLeft': '250px','padding': '10px', 'border': '1px solid #ccc'}),
+                    dcc.Download(id="download_txt"),
                     html.Img(id='wordcloud-image', style={'width': '50%', 'margin': 'auto', 'display': 'block'}),]),
                 #---------------------------------------------------- VISUALIZAR PASSO 2-------------------------------------------------------------------------------------
                 html.H1("Passo 2: Filtrando a nuvem de palavras", style={'margin': '20px auto','textAlign': 'center'}), 
@@ -108,48 +108,56 @@ app.layout = html.Div(children=[
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename')])
 def update_output(contents, filename):
-    global data  
     global tokens_list
 
     if contents is not None:
         try:
+            # Decodificar o conteúdo do arquivo TXT
             content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            decoded = base64.b64decode(content_string).decode('utf-8')
 
-        except Exception as e: # Tratamento genérico de erros    
+            # Verificar se há conteúdo válido no arquivo
+            if len(decoded.strip()) == 0:
+                return html.Div([
+                    html.H3('Erro: Arquivo vazio.'),
+                    html.P('O arquivo carregado não contém texto válido para processamento.')
+                ]), None
+            
+            # Aplicar a função clean_text ao conteúdo do arquivo
+            tokens_list = [clean_text(line.strip()) for line in decoded.splitlines() if line.strip()]
+
+            # Verificar se há tokens após o processamento
+            if not tokens_list or all(len(token) == 0 for token in tokens_list):
+                return html.Div([
+                    html.H3('Não há palavras suficientes para gerar uma nuvem de palavras.'),
+                    html.P('Verifique o conteúdo do arquivo e tente novamente.')
+                ]), None
+            
+            # Gerar a nuvem de palavras
+            wordcloud = WordCloud(width=600, height=300, background_color='white').generate(' '.join(tokens_list))
+            img = io.BytesIO()
+            wordcloud.to_image().save(img, format='JPEG', quality=80)
+            img.seek(0)
+            
+            # Exibir o processamento do texto
+            table_output = html.Div([
+                html.H3('Processamento do texto completo:'),
+                html.P('Texto original:'),
+                html.Pre(decoded[:1000] + '...', style={'whiteSpace': 'pre-wrap', 'wordBreak': 'break-all'}),
+                html.P('Tokens após processamento:'),
+                html.Pre('\n'.join(tokens_list[:8]) + '...', style={'whiteSpace': 'pre-wrap', 'wordBreak': 'break-all'})
+            ])
+
+            # Retornar a exibição do DataFrame e a nuvem de palavras
+            return table_output, 'data:image/jpeg;base64,' + base64.b64encode(img.getvalue()).decode()
+
+        except Exception as e:
             return html.Div([
                 html.H3('Ocorreu um erro ao processar o arquivo:'),
                 html.P(str(e))
             ]), None
-
-        # Process data in parallel using concurrent.futures
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-                tokens_list = list(executor.map(clean_text, data['text']))
-        data['tokens'] = tokens_list
-
-        # Gerar a nuvem de palavras
-        wordcloud = WordCloud(width=600, height=300, background_color='white').generate(' '.join(tokens_list))
-        img = io.BytesIO()
-        wordcloud.to_image().save(img, format='JPEG')
-        img.seek(0)
-        
-        # Exibir as 2 primeiras linhas do DataFrame em uma tabela HTML dentro de um quadro
-        table_output = html.Div([
-            html.H3('2 primeiras linhas do arquivo de saída:'),
-            dash_table.DataTable(
-                columns=[{"name": i, "id": i} for i in data.columns],
-                data=data.to_dict('records')[:2],
-                style_table={'width': '100%', 'maxWidth': '1500px', 'margin': 'auto'},  
-                style_cell={'textOverflow': 'ellipsis', 'textAlign': 'left', 'color': 'black'},
-                style_data={'whiteSpace': 'normal', 'height': 'auto'}
-            )
-        ])
-        
-        # Retornar a exibição do DataFrame e a nuvem de palavras
-        return table_output, 'data:image/jpeg;base64,' + base64.b64encode(img.getvalue()).decode()
     else:
-        return None, None
+        return html.Div(['Arraste e solte ou ', html.A('selecione um arquivo TXT')]), None
 
 # Callback para mostrar a parte do layout após o upload do arquivo
 @app.callback(
@@ -162,23 +170,18 @@ def show_upload_output(contents):
     else:
         return {'display': 'none'}
     
-# Callback para fazer download do arquivo CSV modificado
+# Callback para fazer download do arquivo TXT modificado com os novos tokens
 @app.callback(
-    Output("download_csv", "data"),
-    [Input("btn_csv", "n_clicks")]
-)
-def download_csv(n_clicks):
-    global data  
-    if n_clicks is not None and data is not None:
-        # Crie um buffer de memória para armazenar o CSV
-        buffer = io.StringIO()
-        # Salve o DataFrame no buffer como um arquivo CSV
-        data.to_csv(buffer, index=False, encoding="utf-8", sep=";")
-        # Volte para o início do buffer
-        buffer.seek(0)
-        # Retorne o arquivo CSV como uma resposta para download
-        csv_data = buffer.getvalue()
-        return dict(content=csv_data, filename="tabela.csv")
+    Output("download_txt", "data"),
+    [Input("btn_txt", "n_clicks")])
+def download_txt(n_clicks):
+    global tokens_list
+    
+    if n_clicks is not None and tokens_list:
+        # Criar o conteúdo do arquivo TXT com os novos tokens
+        txt_content = '\n'.join(tokens_list)
+        # Retornar o arquivo TXT como uma resposta para download
+        return dict(content=txt_content, filename="tokens.txt")
 
 # MOSTRAR A NUVEM GERAL APENAS SE O CSV É INSERIDO
 @app.callback(Output('wordcloud-image', 'style'),
@@ -216,7 +219,7 @@ def update_wordcloud_by_list(n_clicks, lista):
         filtered_text = ' '.join(flat_filtered_tokens)
         wordcloud = WordCloud(width=600, height=300, background_color='white').generate(filtered_text)
         img = io.BytesIO()
-        wordcloud.to_image().save(img, format='JPEG')
+        wordcloud.to_image().save(img, format='JPEG', quality=80)
         img.seek(0)
         wordcloud_image = html.Img(src='data:image/jpeg;base64,' + base64.b64encode(img.getvalue()).decode(), style={'width': '100%', 'margin': 'auto', 'display': 'block'})
         
